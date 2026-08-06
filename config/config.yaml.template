@@ -30,9 +30,9 @@ news_collection:
 ai_analysis:
   # DeepSeek配置
   deepseek:
-    api_key: "YOUR_DEEPSEEK_API_KEY"  # 请替换为你的DeepSeek API密钥
-    base_url: "https://api.deepseek.com/v1"
-    model: "deepseek-chat"  # 使用deepseek-chat模型
+    api_key: "DEEPSEEK_API_KEY"  # 请替换为你的DeepSeek API密钥
+    base_url: "https://api.deepseek.com"
+    model: "deepseek-v4-flash"  # 使用deepseek-chat模型
     thinking_model: "deepseek-reasoner"  # 思考模型（用于重要性分析）
     fallback_model: "deepseek-chat"  # 备用模型
     max_tokens: 2000
@@ -73,14 +73,14 @@ email:
   smtp:
     server: "smtp.163.com"  # 163邮箱SMTP服务器
     port: 465               # 163邮箱SSL端口（推荐）或587（TLS端口）
-    username: "your_email@163.com"  # 请替换为你的163邮箱地址
-    password: "your_authorization_password"  # 请替换为你的163邮箱授权密码
+    username: "fantasy2626@163.com"  # 请替换为你的163邮箱地址
+    password: "NTxPTEBzKQDrE7R2"  # 请替换为你的163邮箱授权密码
     use_tls: true          # 163邮箱支持TLS/SSL
     use_ssl: false         # 如果使用465端口，设置为true；587端口设置为false
   
   # 收件人列表
   recipients:
-    - "recipient@example.com"  # 请替换为实际收件人邮箱
+    - "fantasy2626@163.com"  # 请替换为实际收件人邮箱
   
   # 邮件模板
   template:
