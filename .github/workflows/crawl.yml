@@ -1,0 +1,42 @@
+name: AI Stock News Automation
+
+on:
+  schedule:
+    # GitHub 使用的是 UTC 时间，北京时间 08:00 对应 UTC 00:00
+    - cron: '0 0 * * *'    # 每日早 8 点触发 (早晨报告)
+    # 北京时间 23:30 对应 UTC 15:30
+    - cron: '30 15 * * *'  # 每日晚 23:30 触发 (晚间汇总)
+  workflow_dispatch:        # 支持在网页上手动点击运行
+
+jobs:
+  run-news-analysis:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Inject Secrets into Config
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        run: |
+          # 动态将 GitHub Secrets 替换或写入配置文件
+          cp config.yaml.template config.yaml 2>/dev/null || true
+          sed -i "s/DEEPSEEK_API_KEY/$DEEPSEEK_API_KEY/g" config.yaml
+          sed -i "s/NTxPTEBzKQDrE7R2/$EMAIL_PASSWORD/g" config.yaml
+
+      - name: Run News Collector and AI Analysis
+        run: |
+          # 运行项目主启动入口文件（根据项目实际入口文件名调整，如 main.py）
+          python main.py
