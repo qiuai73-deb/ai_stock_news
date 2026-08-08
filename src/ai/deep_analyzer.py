@@ -502,7 +502,6 @@ class DeepAnalyzer:
         # 如果没有找到财经关键词，提取其他关键词
         if not found_keywords:
             # 简单分词：提取3-8字符的词组
-            import re
             words = re.findall(r'[\u4e00-\u9fff]{3,8}', text)
             found_keywords = list(set(words))[:3]
         
@@ -644,7 +643,7 @@ class DeepAnalyzer:
             score += min(info_score, 2)
             
             # 4. 时效性评分 (0-2分)
-            time_keywords = ['最新', '今日', '刚刚', '今年', '近期', '目前', '现在', '2024', '2025']
+            time_keywords = ['最新', '今日', '刚刚', '今年', '近期', '目前', '现在', '2024', '2025', '2026']
             time_score = 0
             for keyword in time_keywords:
                 if keyword in result:
@@ -856,8 +855,9 @@ class DeepAnalyzer:
 深度分析报告："""
 
         return prompt
+
     def _call_ai_model(self, prompt: str) -> str:
-    """调用AI模型进行分析"""
+        """调用AI模型进行分析"""
         try:
             ai_cfg = self.config.get("ai_analysis", {})
             provider = getattr(self, "provider", "openrouter")
@@ -882,7 +882,6 @@ class DeepAnalyzer:
         except Exception as e:
             logger.error(f"调用AI模型失败: {e}")
             raise
-    
     
     def _parse_analysis_response(self, response: str) -> str:
         """解析AI分析响应"""
@@ -1086,4 +1085,4 @@ if __name__ == '__main__':
     logger.info(f"🔍 搜索关键词: {', '.join(result.search_keywords)}")
     logger.info(f"🔍 搜索成功: {result.search_success}")
     logger.info(f"📝 深度分析: {result.deep_analysis_report}")
-    logger.info(f"🤖 使用模型: {result.model_used}") 
+    logger.info(f"🤖 使用模型: {result.model_used}")
