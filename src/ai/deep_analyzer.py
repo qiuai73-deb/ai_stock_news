@@ -99,25 +99,37 @@ class DeepAnalyzer:
             return {}
     
     def _init_client(self):
-        """初始化OpenRouter客户端"""
-        try:
-            openrouter_config = self.config.get("ai_analysis", {}).get("openrouter", {})
-            
-            if not openrouter_config.get("api_key"):
-                logger.warning("未配置OpenRouter API密钥，深度分析将使用模拟模式")
-                self.client = None
-                return
-            
-            self.client = OpenAI(
-                api_key=openrouter_config.get("api_key"),
-                base_url=openrouter_config.get("base_url", "https://openrouter.ai/api/v1")
-            )
-            
-            logger.info("OpenRouter深度分析API客户端初始化成功")
-            
-        except Exception as e:
-            logger.error(f"初始化OpenRouter客户端失败: {e}")
+    """初始化AI模型API客户端（支持多Provider动态切换）"""
+    try:
+        ai_cfg = self.config.get("ai_analysis", {})
+        # 优先读取 active_provider，默认 openrouter
+        self.provider = ai_cfg.get("active_provider", ai_cfg.get("provider", "openrouter"))
+        
+        provider_cfg = ai_cfg.get(self.provider, {})
+        api_key = provider_cfg.get("api_key")
+        
+        if not api_key or "YOUR_" in api_key.upper():
+            logger.warning(f"未配置有效的 {self.provider} API密钥，深度分析将使用模拟模式")
             self.client = None
+            return
+        
+        base_url = provider_cfg.get("base_url")
+        if not base_url:
+            if self.provider == "deepseek":
+                base_url = "https://api.deepseek.com/v1"
+            else:
+                base_url = "https://openrouter.ai/api/v1"
+
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=base_url
+        )
+        
+        logger.info(f"{self.provider} 深度分析API客户端初始化成功")
+        
+    except Exception as e:
+        logger.error(f"初始化 API 客户端失败: {e}")
+        self.client = None
     
     def should_analyze(self, news_item: NewsItem) -> bool:
         """
@@ -846,28 +858,31 @@ class DeepAnalyzer:
         return prompt
     
     def _call_ai_model(self, prompt: str) -> str:
-        """调用AI模型进行分析"""
-        try:
-            openrouter_config = self.config.get("ai_analysis", {}).get("openrouter", {})
-            model = openrouter_config.get("model", "deepseek/deepseek-chat-v3.1")
-            
-            # 读取深度分析专属max_tokens，默认100000，并做安全裁剪
-            deep_max_tokens = self.deep_config.get("max_tokens", 100000)
-            # OpenRouter很多模型存在上下文限制，这里设定硬上限100000，避免请求被拒
-            safe_max_tokens = max(1, min(deep_max_tokens, 100000))
+    """调用AI模型进行分析"""
+    try:
+        ai_cfg = self.config.get("ai_analysis", {})
+        provider = getattr(self, "provider", "openrouter")
+        provider_cfg = ai_cfg.get(provider, {})
+        
+        # 动态获取模型名，若无则根据 provider 提供默认值
+        default_model = "deepseek-chat" if provider == "deepseek" else "deepseek/deepseek-chat-v3.1"
+        model = provider_cfg.get("model", default_model)
+        
+        deep_max_tokens = self.deep_config.get("max_tokens", 100000)
+        safe_max_tokens = max(1, min(deep_max_tokens, 100000))
 
-            response = self.client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=safe_max_tokens,
-                temperature=openrouter_config.get("temperature", 0.1)
-            )
-            
-            return response.choices[0].message.content
-            
-        except Exception as e:
-            logger.error(f"调用AI模型失败: {e}")
-            raise
+        response = self.client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=safe_max_tokens,
+            temperature=provider_cfg.get("temperature", 0.1)
+        )
+        
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        logger.error(f"调用AI模型失败: {e}")
+        raise
     
     def _parse_analysis_response(self, response: str) -> str:
         """解析AI分析响应"""
