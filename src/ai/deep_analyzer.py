@@ -856,33 +856,33 @@ class DeepAnalyzer:
 深度分析报告："""
 
         return prompt
-    
     def _call_ai_model(self, prompt: str) -> str:
     """调用AI模型进行分析"""
-    try:
-        ai_cfg = self.config.get("ai_analysis", {})
-        provider = getattr(self, "provider", "openrouter")
-        provider_cfg = ai_cfg.get(provider, {})
+        try:
+            ai_cfg = self.config.get("ai_analysis", {})
+            provider = getattr(self, "provider", "openrouter")
+            provider_cfg = ai_cfg.get(provider, {})
         
-        # 动态获取模型名，若无则根据 provider 提供默认值
-        default_model = "deepseek-chat" if provider == "deepseek" else "deepseek/deepseek-chat-v3.1"
-        model = provider_cfg.get("model", default_model)
+            # 动态获取模型名，若无则根据 provider 提供默认值
+            default_model = "deepseek-chat" if provider == "deepseek" else "deepseek/deepseek-chat-v3.1"
+            model = provider_cfg.get("model", default_model)
         
-        deep_max_tokens = self.deep_config.get("max_tokens", 100000)
-        safe_max_tokens = max(1, min(deep_max_tokens, 100000))
+            deep_max_tokens = self.deep_config.get("max_tokens", 100000)
+            safe_max_tokens = max(1, min(deep_max_tokens, 100000))
 
-        response = self.client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=safe_max_tokens,
-            temperature=provider_cfg.get("temperature", 0.1)
-        )
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=safe_max_tokens,
+                temperature=provider_cfg.get("temperature", 0.1)
+            )
         
-        return response.choices[0].message.content
+            return response.choices[0].message.content
         
-    except Exception as e:
-        logger.error(f"调用AI模型失败: {e}")
-        raise
+        except Exception as e:
+            logger.error(f"调用AI模型失败: {e}")
+            raise
+    
     
     def _parse_analysis_response(self, response: str) -> str:
         """解析AI分析响应"""
