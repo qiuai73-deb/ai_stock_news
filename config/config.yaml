@@ -35,15 +35,16 @@ ai_analysis:
     model: "deepseek-v4-flash"  # 使用deepseek-chat模型
     thinking_model: "deepseek-reasoner"  # 思考模型（用于重要性分析）
     fallback_model: "deepseek-chat"  # 备用模型
-    max_tokens: 2000
+    max_tokens: 8000
     temperature: 0.1
   
   # OpenRouter配置
+  # 将 OpenRouter 配置重定向为 DeepSeek 官方配置
   openrouter:
-    api_key: "YOUR_OPENROUTER_API_KEY"  # 请替换为你的OpenRouter API密钥
-    base_url: "https://openrouter.ai/api/v1"
-    model: "deepseek/deepseek-r1-0528:free"  # 使用免费的deepseek-r1模型
-    max_tokens: 10000
+    api_key: "DEEPSEEK_API_KEY"  # 依然填你的 DeepSeek Key 占位符
+    base_url: "https://api.deepseek.com"  # 改为 DeepSeek 官方接口
+    model: "deepseek-v4-flash"  # 改为 DeepSeek 官方 R1 思考模型（或 deepseek-chat）
+    max_tokens: 8000
     temperature: 0.1
   
   # 分析参数
