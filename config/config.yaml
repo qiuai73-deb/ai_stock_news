@@ -38,7 +38,6 @@ ai_analysis:
     max_tokens: 8000
     temperature: 0.1
   
-  # OpenRouter配置
   # 将 OpenRouter 配置重定向为 DeepSeek 官方配置
   openrouter:
     api_key: "DEEPSEEK_API_KEY"  # 依然填你的 DeepSeek Key 占位符
@@ -77,7 +76,7 @@ email:
     username: "fantasy2626@163.com"  # 请替换为你的163邮箱地址
     password: "NTxPTEBzKQDrE7R2"  # 请替换为你的163邮箱授权密码
     use_tls: true          # 163邮箱支持TLS/SSL
-    use_ssl: false         # 如果使用465端口，设置为true；587端口设置为false
+    use_ssl: true         # 如果使用465端口，设置为true；587端口设置为false
   
   # 收件人列表
   recipients:
