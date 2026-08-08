@@ -71,4 +71,4 @@ jobs:
       - name: Run News Collector and AI Analysis
         run: |
           # 运行项目主启动入口文件（根据项目实际入口文件名调整，如 main.py）
-          python main.py
+          python main.py run-once
