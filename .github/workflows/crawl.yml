@@ -30,11 +30,43 @@ jobs:
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
-          # 动态将 GitHub Secrets 替换或写入配置文件
-          cp config.yaml.template config.yaml 2>/dev/null || true
-          sed -i "s/DEEPSEEK_API_KEY/$DEEPSEEK_API_KEY/g" config.yaml
-          sed -i "s/NTxPTEBzKQDrE7R2/$EMAIL_PASSWORD/g" config.yaml
+          # 1. 检查配置文件是否存在，如果不存在则用模板复制，如果都没有则报错提示
+          if [ -f config.yaml.template ]; then
+            cp config.yaml.template config.yaml
+          elif [ -f config.yaml.example ]; then
+            cp config.yaml.example config.yaml
+          elif [ ! -f config.yaml ]; then
+            echo "Error: config.yaml file or template does not exist!"
+            exit 1
+          fi
+
+          # 2. 使用 Python 脚本安全注入 Secrets（不会因特殊字符报错）
+          python -c "
+          import os, yaml
+
+          config_file = 'config.yaml'
+          with open(config_file, 'r', encoding='utf-8') as f:
+              data = yaml.safe_load(f) or {}
+
+          # 替换 DeepSeek API Key
+          if os.getenv('DEEPSEEK_API_KEY'):
+              data.setdefault('ai_analysis', {}).setdefault('deepseek', {})['api_key'] = os.getenv('DEEPSEEK_API_KEY')
+
+          # 替换 OpenRouter API Key
+          if os.getenv('OPENROUTER_API_KEY'):
+              data.setdefault('ai_analysis', {}).setdefault('openrouter', {})['api_key'] = os.getenv('OPENROUTER_API_KEY')
+
+          # 替换 邮箱授权码
+          if os.getenv('EMAIL_PASSWORD'):
+              data.setdefault('email', {}).setdefault('smtp', {})['password'] = os.getenv('EMAIL_PASSWORD')
+
+          with open(config_file, 'w', encoding='utf-8') as f:
+              yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
+
+          print('Config successfully updated with secrets.')
+          "
 
       - name: Run News Collector and AI Analysis
         run: |
