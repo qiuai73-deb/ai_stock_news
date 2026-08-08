@@ -99,37 +99,37 @@ class DeepAnalyzer:
             return {}
     
     def _init_client(self):
-    """初始化AI模型API客户端（支持多Provider动态切换）"""
-    try:
-        ai_cfg = self.config.get("ai_analysis", {})
-        # 优先读取 active_provider，默认 openrouter
-        self.provider = ai_cfg.get("active_provider", ai_cfg.get("provider", "openrouter"))
-        
-        provider_cfg = ai_cfg.get(self.provider, {})
-        api_key = provider_cfg.get("api_key")
-        
-        if not api_key or "YOUR_" in api_key.upper():
-            logger.warning(f"未配置有效的 {self.provider} API密钥，深度分析将使用模拟模式")
-            self.client = None
-            return
-        
-        base_url = provider_cfg.get("base_url")
-        if not base_url:
-            if self.provider == "deepseek":
-                base_url = "https://api.deepseek.com/v1"
-            else:
-                base_url = "https://openrouter.ai/api/v1"
+        """初始化AI模型API客户端（支持多Provider动态切换）"""
+        try:
+            ai_cfg = self.config.get("ai_analysis", {})
+            # 优先读取 active_provider，默认 openrouter
+            self.provider = ai_cfg.get("active_provider", ai_cfg.get("provider", "openrouter"))
+            
+            provider_cfg = ai_cfg.get(self.provider, {})
+            api_key = provider_cfg.get("api_key")
+            
+            if not api_key or "YOUR_" in str(api_key).upper():
+                logger.warning(f"未配置有效的 {self.provider} API密钥，深度分析将使用模拟模式")
+                self.client = None
+                return
+            
+            base_url = provider_cfg.get("base_url")
+            if not base_url:
+                if self.provider == "deepseek":
+                    base_url = "https://api.deepseek.com/v1"
+                else:
+                    base_url = "https://openrouter.ai/api/v1"
 
-        self.client = OpenAI(
-            api_key=api_key,
-            base_url=base_url
-        )
-        
-        logger.info(f"{self.provider} 深度分析API客户端初始化成功")
-        
-    except Exception as e:
-        logger.error(f"初始化 API 客户端失败: {e}")
-        self.client = None
+            self.client = OpenAI(
+                api_key=api_key,
+                base_url=base_url
+            )
+            
+            logger.info(f"{self.provider} 深度分析API客户端初始化成功")
+            
+        except Exception as e:
+            logger.error(f"初始化 API 客户端失败: {e}")
+            self.client = None
     
     def should_analyze(self, news_item: NewsItem) -> bool:
         """
