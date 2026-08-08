@@ -31,7 +31,7 @@ ai_analysis:
   # DeepSeek配置
   deepseek:
     api_key: "DEEPSEEK_API_KEY"  # 请替换为你的DeepSeek API密钥
-    base_url: "https://api.deepseek.com"
+    base_url: "https://api.deepseek.com/v1"
     model: "deepseek-reasoner"  # 使用deepseek-chat模型
     thinking_model: "deepseek-reasoner"  # 思考模型（用于重要性分析）
     fallback_model: "deepseek-chat"  # 备用模型
@@ -41,7 +41,7 @@ ai_analysis:
   # OpenRouter配置
   openrouter:
     api_key: "DEEPSEEK_API_KEY"  # 请替换为你的OpenRouter API密钥
-    base_url: "https://api.deepseek.com"
+    base_url: "https://api.deepseek.com/v1"
     model: "deepseek-reasoner"  # 使用免费的deepseek-r1模型
     max_tokens: 10000
     temperature: 0.1
@@ -75,8 +75,8 @@ email:
     port: 465               # 163邮箱SSL端口（推荐）或587（TLS端口）
     username: "fantasy2626@163.com"  # 请替换为你的163邮箱地址
     password: "NTxPTEBzKQDrE7R2"  # 请替换为你的163邮箱授权密码
-    use_tls: true          # 163邮箱支持TLS/SSL
-    use_ssl: false         # 如果使用465端口，设置为true；587端口设置为false
+    use_tls: false          # 163邮箱支持TLS/SSL
+    use_ssl: true         # 如果使用465端口，设置为true；587端口设置为false
   
   # 收件人列表
   recipients:
