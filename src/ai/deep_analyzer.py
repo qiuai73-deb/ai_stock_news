@@ -99,11 +99,17 @@ class DeepAnalyzer:
             return {}
     
     def _init_client(self):
-        """初始化AI模型API客户端（支持多Provider动态切换）"""
+        """初始化AI模型API客户端（优先使用 deepseek 配置）"""
         try:
             ai_cfg = self.config.get("ai_analysis", {})
-            # 优先读取 active_provider，默认 openrouter
-            self.provider = ai_cfg.get("active_provider", ai_cfg.get("provider", "openrouter"))
+            
+            # 优先获取 active_provider，如果没有设置，优先判断 deepseek 节点
+            self.provider = ai_cfg.get("active_provider")
+            if not self.provider:
+                if "deepseek" in ai_cfg and ai_cfg["deepseek"].get("api_key"):
+                    self.provider = "deepseek"
+                else:
+                    self.provider = "openrouter"
             
             provider_cfg = ai_cfg.get(self.provider, {})
             api_key = provider_cfg.get("api_key")
@@ -125,7 +131,7 @@ class DeepAnalyzer:
                 base_url=base_url
             )
             
-            logger.info(f"{self.provider} 深度分析API客户端初始化成功")
+            logger.info(f"{self.provider} 深度分析API客户端初始化成功 (Base URL: {base_url})")
             
         except Exception as e:
             logger.error(f"初始化 API 客户端失败: {e}")
