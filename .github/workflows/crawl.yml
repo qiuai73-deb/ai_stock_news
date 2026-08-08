@@ -26,57 +26,87 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Inject Secrets into Config
+      - name: Inject Secrets into Config and Environment
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
         run: |
-          # 1. 如果 config.yaml 不存在，才从模板复制（避免覆盖已提交的 config.yaml）
+          # 1. 如果 config.yaml 不存在，尝试复制模板
           if [ ! -f config.yaml ]; then
-            if [ -f config.yaml.template ]; then
-              cp config.yaml.template config.yaml
-            elif [ -f config.yaml.example ]; then
-              cp config.yaml.example config.yaml
-            else
-              echo "Error: config.yaml or template not found!"
-              exit 1
-            fi
+            cp config.yaml.template config.yaml 2>/dev/null || cp config.yaml.example config.yaml 2>/dev/null || true
           fi
 
-          # 2. 安全注入 Secrets 并重定向 OpenRouter 到 DeepSeek 官方接口
+          # 2. 运行 Python 脚本把 Secrets 写入 config.yaml，并打印检查信息
           python -c "
           import os, yaml
 
-          config_file = 'config.yaml'
-          with open(config_file, 'r', encoding='utf-8') as f:
-              data = yaml.safe_load(f) or {}
-
-          # 获取 Secrets 并自动剔除空白字符
           ds_key = os.getenv('DEEPSEEK_API_KEY', '').strip()
           email_pwd = os.getenv('EMAIL_PASSWORD', '').strip()
 
-          if not ds_key:
-              print('❌ 警告: DEEPSEEK_API_KEY 读取为空！请检查 GitHub Secrets。')
-          else:
-              # 设置 deepseek 配置
-              data.setdefault('ai_analysis', {}).setdefault('deepseek', {})['api_key'] = ds_key
-              
-              # 强制将 openrouter 配置也定向至 DeepSeek 官方，防止调错接口
-              data.setdefault('ai_analysis', {}).setdefault('openrouter', {})['api_key'] = ds_key
-              data.setdefault('ai_analysis', {}).setdefault('openrouter', {})['base_url'] = 'https://api.deepseek.com'
-              data.setdefault('ai_analysis', {}).setdefault('openrouter', {})['model'] = 'deepseek-chat'
+          config_file = 'config.yaml'
+          try:
+              with open(config_file, 'r', encoding='utf-8') as f:
+                  data = yaml.safe_load(f) or {}
+          except Exception as e:
+              data = {}
 
+          # 更新 deepseek 配置
+          data.setdefault('ai_analysis', {}).setdefault('deepseek', {})['api_key'] = ds_key
+          data.setdefault('ai_analysis', {}).setdefault('deepseek', {})['base_url'] = 'https://api.deepseek.com'
+          
+          # 强制将 openrouter 重定向至 deepseek 官方，防走错通道
+          data.setdefault('ai_analysis', {}).setdefault('openrouter', {})['api_key'] = ds_key
+          data.setdefault('ai_analysis', {}).setdefault('openrouter', {})['base_url'] = 'https://api.deepseek.com'
+          data.setdefault('ai_analysis', {}).setdefault('openrouter', {})['model'] = 'deepseek-reasoner'
+
+          # 更新 邮箱密码与 SSL 修正
           if email_pwd:
               data.setdefault('email', {}).setdefault('smtp', {})['password'] = email_pwd
+          data.setdefault('email', {}).setdefault('smtp', {})['use_ssl'] = True
+          data.setdefault('email', {}).setdefault('smtp', {})['use_tls'] = False
 
           with open(config_file, 'w', encoding='utf-8') as f:
               yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
 
-          # 校验并打印 Key 长度（保证安全性，不暴露明文）
-          written_key = data.get('ai_analysis', {}).get('deepseek', {}).get('api_key', '')
-          print(f'✅ 配置注入完成！DeepSeek Key 写入长度为: {len(written_key)} 位')
+          print('--- Secret 注入结果检查 ---')
+          print('读取到的 Key 长度:', len(ds_key))
+          if ds_key:
+              print('Key 前缀检查:', ds_key[:4] + '...')
+          else:
+              print('❌ 错误: Secrets 中的 DEEPSEEK_API_KEY 为空！')
           "
 
+      - name: Test DeepSeek API Key Directly
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          python -c "
+          import urllib.request, json, os
+
+          key = os.getenv('DEEPSEEK_API_KEY', '').strip()
+          url = 'https://api.deepseek.com/chat/completions'
+          headers = {
+              'Content-Type': 'application/json',
+              'Authorization': f'Bearer {key}'
+          }
+          payload = {
+              'model': 'deepseek-chat',
+              'messages': [{'role': 'user', 'content': 'hi'}],
+              'max_tokens': 5
+          }
+
+          req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers=headers)
+          try:
+              with urllib.request.urlopen(req) as response:
+                  res = json.loads(response.read().decode('utf-8'))
+                  print('✅ DeepSeek API Key 验证成功！响应:', res['choices'][0]['message']['content'])
+          except Exception as e:
+              print('❌ API 测试失败！详细报错信息:', e)
+              exit(1)
+          "
+      
+      
+      
       - name: Run News Collector and AI Analysis
         run: |
           # 运行项目主启动入口文件（根据项目实际入口文件名调整，如 main.py）
