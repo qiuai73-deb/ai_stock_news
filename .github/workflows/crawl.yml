@@ -76,38 +76,15 @@ jobs:
               print('❌ 错误: Secrets 中的 DEEPSEEK_API_KEY 为空！')
           "
 
-      - name: Test DeepSeek API Key Directly
-        env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-        run: |
-          python -c "
-          import urllib.request, json, os
-
-          key = os.getenv('DEEPSEEK_API_KEY', '').strip()
-          url = 'https://api.deepseek.com/chat/completions'
-          headers = {
-              'Content-Type': 'application/json',
-              'Authorization': f'Bearer {key}'
-          }
-          payload = {
-              'model': 'deepseek-chat',
-              'messages': [{'role': 'user', 'content': 'hi'}],
-              'max_tokens': 5
-          }
-
-          req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers=headers)
-          try:
-              with urllib.request.urlopen(req) as response:
-                  res = json.loads(response.read().decode('utf-8'))
-                  print('✅ DeepSeek API Key 验证成功！响应:', res['choices'][0]['message']['content'])
-          except Exception as e:
-              print('❌ API 测试失败！详细报错信息:', e)
-              exit(1)
-          "
-      
-      
       
       - name: Run News Collector and AI Analysis
+     
+        env:
+          # 强行将所有可能的 Key 环境变量全部指定为你的 DeepSeek Key
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          # 强行把第三方 API 域名重定向为 DeepSeek 官方域名
+          DEEPSEEK_BASE_URL: "https://api.deepseek.com"
+          OPENROUTER_BASE_URL: "https://api.deepseek.com"
         run: |
-          # 运行项目主启动入口文件（根据项目实际入口文件名调整，如 main.py）
           python main.py run-once
