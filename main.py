@@ -245,11 +245,17 @@ def run_single_pipeline():
             high_importance = len([n for n in news_list if n.importance_score >= 70])
             medium_importance = len([n for n in news_list if 40 <= n.importance_score < 70])
             low_importance = len([n for n in news_list if n.importance_score < 40])
-            
+
             print(f"📊 重要性分布:")
             print(f"  🔴 高重要性: {high_importance} 条")
             print(f"  🟡 中等重要性: {medium_importance} 条")
             print(f"  🟢 低重要性: {low_importance} 条")
+
+            # 将报告推送到钉钉（未配置时降级为仅日志，不报错）
+            try:
+                scheduler._send_instant_email(news_list, "AI新闻日报")
+            except Exception as e:
+                logger.error(f"发送报告到钉钉失败: {e}")
         else:
             logger.warning("没有收集到新新闻")
             
@@ -318,8 +324,8 @@ def show_help():
    background   - 后台启动增强版调度器
    status       - 查看调度器状态
    run-once     - 手动执行一次完整流程（带重要性分析）
-   enhanced     - 运行增强版流程并发送测试邮件
-   summary      - 手动发送今日汇总邮件
+   enhanced     - 运行增强版流程并发送测试报告（钉钉）
+   summary      - 手动发送今日汇总报告（钉钉）
    help         - 显示此帮助信息
 
 📁 测试功能:
