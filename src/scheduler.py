@@ -24,6 +24,7 @@ from .ai.ai_analyzer import AIAnalyzer
 from .ai.importance_analyzer import ImportanceAnalyzer
 from .ai.deep_analyzer import DeepAnalyzer
 from .email_sender import EmailSender
+from .dingtalk_notifier import DingTalkNotifier
 from .utils.logger import get_logger
 from .utils.database import db_manager
 
@@ -87,6 +88,7 @@ class TaskScheduler:
         self.importance_analyzer = None
         self.deep_analyzer = None
         self.email_sender = None
+        self.notifier = None  # 统一通知器（钉钉/邮件，按 notification.channel 选择）
         
         # 设置事件监听器和信号处理器
         self._setup_event_listeners()
@@ -428,7 +430,8 @@ class TaskScheduler:
                 'ai_analyzer': self.ai_analyzer is not None,
                 'importance_analyzer': self.importance_analyzer is not None,
                 'deep_analyzer': self.deep_analyzer is not None,
-                'email_sender': self.email_sender is not None
+                'email_sender': self.email_sender is not None,
+                'notifier': self.notifier is not None
             }
             
             # 检查任务执行状态
@@ -648,14 +651,34 @@ class TaskScheduler:
             self.importance_analyzer = ImportanceAnalyzer()
             self.deep_analyzer = DeepAnalyzer()
             self.email_sender = EmailSender()
-            
+            self.notifier = self._build_notifier()
+
             logger.info("组件初始化完成")
             return True
             
         except Exception as e:
             logger.error(f"组件初始化失败: {e}")
             return False
-    
+
+    def _build_notifier(self):
+        """
+        根据 notification.channel 构建统一通知器
+        - dingtalk : 钉钉自定义机器人（默认，替代邮件）
+        - email    : 保留原邮件发送
+        """
+        channel = self.config.get('notification', {}).get('channel', 'dingtalk')
+        if channel == 'email':
+            logger.info("通知渠道：邮件（email）")
+            return EmailSender()
+        # 默认钉钉
+        try:
+            notifier = DingTalkNotifier()
+            logger.info(f"通知渠道：钉钉（dingtalk），可用={notifier.available}")
+            return notifier
+        except Exception as e:
+            logger.error(f"钉钉通知初始化失败，回退到邮件：{e}")
+            return EmailSender()
+
     def add_news_collection_job(self, interval_minutes: int = None):
         """
         添加新闻收集任务
@@ -890,12 +913,12 @@ class TaskScheduler:
             raise
     
     def _email_task(self):
-        """邮件发送任务"""
-        logger.info("=== 开始执行邮件发送任务 ===")
+        """报告发送任务（钉钉/邮件，按 notification.channel 选择）"""
+        logger.info("=== 开始执行报告发送任务 ===")
         
         try:
-            if not self.email_sender:
-                self.email_sender = EmailSender()
+            if not self.notifier:
+                self.notifier = self._build_notifier()
             
             # 获取最近的分析结果
             recent_hours = self.config.get('scheduler', {}).get('email_recent_hours', 24)
@@ -904,17 +927,17 @@ class TaskScheduler:
             # 这里需要从数据库获取分析结果，暂时使用最新新闻
             news_list = db_manager.get_news_items(limit=10)
             if not news_list:
-                logger.info("没有新闻数据，跳过邮件发送")
+                logger.info("没有新闻数据，跳过报告发送")
                 return False
             
             # 过滤分数低于50的新闻
             filtered_news = self._filter_news_by_score(news_list, 50)
             
             if not filtered_news:
-                logger.info(f"有 {len(news_list)} 条新闻，但没有分数达到50分的重要新闻，跳过邮件发送")
+                logger.info(f"有 {len(news_list)} 条新闻，但没有分数达到50分的重要新闻，跳过报告发送")
                 return False
             
-            # 逐个分析过滤后的新闻用于邮件
+            # 逐个分析过滤后的新闻用于报告
             results = []
             for news_item in filtered_news[:5]:
                 try:
@@ -924,18 +947,18 @@ class TaskScheduler:
                     logger.error(f"分析新闻失败: {e}")
                     continue
             
-            # 发送邮件
-            success = self.email_sender.send_analysis_report(results)
+            # 发送报告
+            success = self.notifier.send_analysis_report(results)
             
             if success:
-                logger.info(f"邮件发送任务完成，包含 {len(results)} 条重要新闻（原始 {len(news_list)} 条）")
+                logger.info(f"报告发送任务完成，包含 {len(results)} 条重要新闻（原始 {len(news_list)} 条）")
             else:
-                logger.error("邮件发送任务失败")
+                logger.error("报告发送任务失败")
             
             return success
             
         except Exception as e:
-            logger.error(f"邮件发送任务失败: {e}")
+            logger.error(f"报告发送任务失败: {e}")
             raise
     
     def _full_pipeline_task(self):
@@ -1130,13 +1153,16 @@ class TaskScheduler:
             # 统计信息（在生成报告前计算，避免重复）
             stats = self._calculate_news_stats(sorted_news)
             
-            # 生成汇总报告（包含所有新闻，不进行分数过滤，因为这是汇总邮件）
+            # 生成汇总报告（包含所有新闻，不进行分数过滤，因为这是汇总报告）
             report = self._generate_daily_summary_report(sorted_news, stats)
             
-            # 发送邮件
-            self._send_summary_email(report)
+            # 发送报告（钉钉/邮件，优先使用结构化新闻列表 + 统计）
+            if not self.notifier:
+                self.notifier = self._build_notifier()
+            title = f"📊 每日新闻汇总 - {datetime.now().strftime('%Y年%m月%d日')}"
+            self.notifier.send_news_digest(sorted_news, title=title, stats=stats)
             
-            logger.info(f"每日汇总邮件发送成功，包含 {len(sorted_news)} 条新闻（高重要性: {stats['high']}, 中等: {stats['medium']}, 低重要性: {stats['low']}）")
+            logger.info(f"每日汇总报告发送成功，包含 {len(sorted_news)} 条新闻（高重要性: {stats['high']}, 中等: {stats['medium']}, 低重要性: {stats['low']}）")
             
         except Exception as e:
             logger.error(f"每日汇总邮件发送失败: {e}")
@@ -1191,40 +1217,29 @@ class TaskScheduler:
             logger.error(f"日志文件清理失败: {e}")
     
     def _send_instant_email(self, news_list, title_prefix: str = ""):
-        """发送即时新闻邮件"""
+        """发送即时新闻报告（钉钉/邮件）"""
         try:
-            if not self.email_sender:
-                self.email_sender = EmailSender()
+            if not self.notifier:
+                self.notifier = self._build_notifier()
             
             # 过滤分数低于50的新闻
             filtered_news = self._filter_news_by_score(news_list, 50)
             
             if not filtered_news:
-                logger.info(f"要发送的 {len(news_list)} 条新闻中没有分数达到50分的，跳过邮件发送")
+                logger.info(f"要发送的 {len(news_list)} 条新闻中没有分数达到50分的，跳过报告发送")
                 return
             
             # 按重要性排序
             sorted_news = sorted(filtered_news, key=lambda x: x.importance_score, reverse=True)
             
-            # 生成报告
-            report = self._generate_instant_report(sorted_news)
-            
-            # 获取配置的收件人
-            recipients = self.config.get('email', {}).get('recipients', [])
-            
-            # 发送邮件
+            # 发送报告
             subject = f"📰 {title_prefix} - {datetime.now().strftime('%H:%M')}"
-            self.email_sender.send_simple_email(
-                recipients=recipients,
-                subject=subject,
-                content=report,
-                is_html=True
-            )
+            self.notifier.send_news_digest(sorted_news, title=subject)
             
-            logger.info(f"即时邮件发送成功: {title_prefix}，包含 {len(sorted_news)} 条重要新闻（原始 {len(news_list)} 条）")
+            logger.info(f"即时报告发送成功: {title_prefix}，包含 {len(sorted_news)} 条重要新闻（原始 {len(news_list)} 条）")
             
         except Exception as e:
-            logger.error(f"发送即时邮件失败: {e}")
+            logger.error(f"发送即时报告失败: {e}")
     
     def _send_summary_email(self, report: str):
         """发送汇总邮件"""
@@ -1447,6 +1462,7 @@ class TaskScheduler:
                 'importance_analyzer': self.importance_analyzer is not None,
                 'deep_analyzer': self.deep_analyzer is not None,
                 'email_sender': self.email_sender is not None,
+                'notifier': self.notifier is not None,
                 'database': True,  # 基本检查
                 'scheduler': self.is_running
             }
