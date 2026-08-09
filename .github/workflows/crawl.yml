@@ -29,7 +29,8 @@ jobs:
       - name: Inject Secrets into Config and Environment
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
         run: |
           # 1. 如果 config.yaml 不存在，尝试复制模板
           if [ ! -f config.yaml ]; then
@@ -41,7 +42,8 @@ jobs:
           import os, yaml
 
           ds_key = os.getenv('DEEPSEEK_API_KEY', '').strip()
-          email_pwd = os.getenv('EMAIL_PASSWORD', '').strip()
+          dt_webhook = os.getenv('DINGTALK_WEBHOOK', '').strip()
+          dt_secret = os.getenv('DINGTALK_SECRET', '').strip()
 
           config_file = 'config.yaml'
           try:
@@ -59,21 +61,28 @@ jobs:
           data.setdefault('ai_analysis', {}).setdefault('openrouter', {})['base_url'] = 'https://api.deepseek.com'
           data.setdefault('ai_analysis', {}).setdefault('openrouter', {})['model'] = 'deepseek-reasoner'
 
-          # 更新 邮箱密码与 SSL 修正
-          if email_pwd:
-              data.setdefault('email', {}).setdefault('smtp', {})['password'] = email_pwd
-          data.setdefault('email', {}).setdefault('smtp', {})['use_ssl'] = True
-          data.setdefault('email', {}).setdefault('smtp', {})['use_tls'] = False
+          # 更新通知渠道为钉钉，并写入 Webhook / Secret
+          notif = data.setdefault('notification', {})
+          notif['channel'] = 'dingtalk'
+          dt = notif.setdefault('dingtalk', {})
+          if dt_webhook:
+              dt['webhook'] = dt_webhook
+          if dt_secret:
+              dt['secret'] = dt_secret
 
           with open(config_file, 'w', encoding='utf-8') as f:
               yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
 
           print('--- Secret 注入结果检查 ---')
-          print('读取到的 Key 长度:', len(ds_key))
+          print('DeepSeek Key 长度:', len(ds_key))
           if ds_key:
               print('Key 前缀检查:', ds_key[:4] + '...')
           else:
               print('❌ 错误: Secrets 中的 DEEPSEEK_API_KEY 为空！')
+          print('钉钉 Webhook 长度:', len(dt_webhook))
+          print('钉钉 Secret 长度:', len(dt_secret))
+          if not dt_webhook:
+              print('⚠️ 警告: Secrets 中的 DINGTALK_WEBHOOK 为空，报告将无法推送到钉钉')
           "
 
       
@@ -86,5 +95,8 @@ jobs:
           # 强行把第三方 API 域名重定向为 DeepSeek 官方域名
           DEEPSEEK_BASE_URL: "https://api.deepseek.com"
           OPENROUTER_BASE_URL: "https://api.deepseek.com"
+          # 钉钉推送所需的环境变量（与 crawl.yml 注入的 Secret 一致）
+          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
         run: |
           python main.py run-once
